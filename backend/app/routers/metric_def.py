@@ -74,6 +74,15 @@ def get_entry(entry_id: int) -> dict:
     return entry
 
 
+@router.get("/{entry_id}/filter_datasets")
+def filter_datasets(entry_id: int) -> dict:
+    """跨模块联动：读取引用本指标的筛选结果数据集，校验筛选字段与统计粒度。"""
+    report, error = service.filter_dataset_validations(entry_id)
+    if report is None:
+        raise HTTPException(status_code=404, detail=error)
+    return report
+
+
 @router.post("", response_model=ActionResult)
 def create_entry(payload: dict[str, object]) -> ActionResult:
     """登记一条指标定义，缺字段时说明原因而不是静默丢弃。"""

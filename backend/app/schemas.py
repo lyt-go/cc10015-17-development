@@ -35,6 +35,32 @@ class ActionPayload(BaseModel):
     remark: str | None = None
 
 
+class GeneratePayload(BaseModel):
+    """生成筛选结果数据集：可要求模拟中断以验证断点续写。"""
+
+    simulate_interrupt: bool = False
+
+
+class ConflictPayload(BaseModel):
+    """版本冲突判定：固定旧版本生成历史集合，或采用新版本生成当前集合。"""
+
+    strategy: str
+    simulate_interrupt: bool = False
+
+
+class RevisePayload(BaseModel):
+    """规则修订：不指定新版本号时自动递增。"""
+
+    new_version: str | None = None
+
+
+class GenerateResult(BaseModel):
+    ok: bool
+    message: str
+    dataset: dict[str, Any] | None = None
+    conflict: dict[str, Any] | None = None
+
+
 
 class ExperimentEntry(BaseModel):
     """实验方案明细结构。"""

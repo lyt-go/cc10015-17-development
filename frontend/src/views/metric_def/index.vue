@@ -48,6 +48,7 @@
             >
               {{ action }}
             </button>
+            <button class="link" type="button" :data-testid="`linkage-${row.id}`" @click="loadLinkage(row)">联动校验</button>
           </td>
         </tr>
         <tr v-if="!rows.length">
@@ -72,6 +73,32 @@
       </form>
     </div>
 
+    <div v-if="linkage" class="linkage-panel" data-testid="linkage-panel">
+      <header class="dataset-side-head">
+        <span>筛选结果数据集联动校验：{{ linkage.指标编号 }}（{{ linkage.指标名称 }} · 统计粒度 {{ linkage.统计粒度 }}）</span>
+        <button class="link" type="button" @click="linkage = null">收起</button>
+      </header>
+      <table v-if="linkage.items.length" class="data-table">
+        <thead>
+          <tr><th>集合编号</th><th>规则编号</th><th>规则版本</th><th>筛选字段</th><th>统计粒度</th><th>集合状态</th><th>校验结果</th></tr>
+        </thead>
+        <tbody>
+          <tr v-for="item in linkage.items" :key="item.集合编号">
+            <td>{{ item.集合编号 }}</td>
+            <td>{{ item.规则编号 }}</td>
+            <td>{{ item.规则版本 }}</td>
+            <td>{{ item.筛选字段 || '—' }}</td>
+            <td>{{ item.统计粒度 || '—' }}</td>
+            <td>{{ item.集合状态 }}</td>
+            <td :class="item.通过 ? 'ok-text' : 'error-text'">
+              {{ item.通过 ? '通过' : `未通过（${failedChecks(item.校验)}）` }}
+            </td>
+          </tr>
+        </tbody>
+      </table>
+      <p v-else class="empty-state">暂无引用该指标的筛选结果数据集</p>
+    </div>
+
     <footer class="page-foot">
       <span>共 {{ total }} 条指标定义记录</span>
       <span v-if="errorMessage" class="error-text">{{ errorMessage }}</span>
@@ -85,6 +112,25 @@ import { computed, onMounted, ref } from 'vue'
 import { request } from '@/api/client'
 
 type Row = Record<string, string | number | null>
+
+type LinkageItem = {
+  集合编号: string
+  规则编号: string
+  规则版本: string
+  筛选字段: string | null
+  统计粒度: string | null
+  集合状态: string
+  校验: Record<string, boolean>
+  通过: boolean
+}
+
+type LinkageReport = {
+  指标编号: string
+  指标名称: string
+  统计粒度: string
+  items: LinkageItem[]
+  total: number
+}
 
 const ENDPOINT = '/api/metric_def'
 const columns = ["指标编号", "指标名称", "计算公式", "统计粒度", "时间窗口", "基准取值", "精度位数", "口径版本"]
@@ -100,6 +146,23 @@ const filterFields = columns.slice(0, 3)
 const showCreate = ref(false)
 const creating = ref(false)
 const createValues = ref<Record<string, string>>({})
+const linkage = ref<LinkageReport | null>(null)
+
+function failedChecks(checks: Record<string, boolean>) {
+  return Object.entries(checks ?? {}).filter(([, ok]) => !ok).map(([name]) => name).join('、')
+}
+
+async function loadLinkage(row: Row) {
+  errorMessage.value = ''
+  try {
+    const response = await request(`${ENDPOINT}/${row.id}/filter_datasets`)
+    const payload = await response.json()
+    if (!response.ok) throw new Error(payload.detail || '联动校验读取失败')
+    linkage.value = payload
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : '联动校验读取失败'
+  }
+}
 const stats = computed(() => [
   { label: metricNames[0], value: total.value },
   { label: metricNames[1], value: rows.value.filter((row) => row.status === statuses[1]).length },

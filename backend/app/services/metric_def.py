@@ -63,3 +63,36 @@ class MetricDefService:
         entry["pending"] = target != STATUS_ORDER[-1]
         entry["abnormal"] = action in NEGATIVE_ACTIONS
         return entry, f"指标定义已{action}"
+
+    def filter_dataset_validations(self, entry_id: int) -> tuple[dict[str, Any] | None, str]:
+        """跨模块联动：读取筛选结果数据集中的指标编号，校验筛选字段与统计粒度。"""
+        metric = store.find(MODULE, entry_id)
+        if metric is None:
+            return None, f"指标定义 {entry_id} 不存在或已归档"
+        code = str(metric.get("指标编号") or "")
+        datasets = [row for row in store.rows("filter_dataset") if row.get("指标编号") == code]
+        items = []
+        for dataset in datasets:
+            snapshot = dataset.get("rule_snapshot", {})
+            checks = {
+                "指标编号一致": dataset.get("指标编号") == code,
+                "统计粒度一致": str(dataset.get("统计粒度") or "") == str(metric.get("统计粒度") or ""),
+                "筛选字段非空": bool(str(snapshot.get("筛选字段") or "").strip()),
+            }
+            items.append({
+                "集合编号": dataset.get("集合编号"),
+                "规则编号": dataset.get("规则编号"),
+                "规则版本": dataset.get("规则版本"),
+                "筛选字段": snapshot.get("筛选字段"),
+                "统计粒度": dataset.get("统计粒度"),
+                "集合状态": dataset.get("状态"),
+                "校验": checks,
+                "通过": all(checks.values()),
+            })
+        return {
+            "指标编号": code,
+            "指标名称": metric.get("指标名称"),
+            "统计粒度": metric.get("统计粒度"),
+            "items": items,
+            "total": len(items),
+        }, ""
